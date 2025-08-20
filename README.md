@@ -98,10 +98,10 @@ go run ./scr/producer.go
 
 * Кеш действительно ускоряет получение данных (например, при повторных запросах по одному и тому же ID). Было подтверждено с помощью Postman:
 
-** без кэша - ~30 мс
+* ### без кэша - ~30 мс
   <img width="1374" height="712" alt="image" src="https://github.com/user-attachments/assets/059508c5-094c-410c-bb88-e8fa7a1db947" />
   
-** с кэшем ~ 10 мс
+* ### с кэшем ~ 10 мс
   <img width="1322" height="713" alt="image" src="https://github.com/user-attachments/assets/03c82c03-bfdf-4ddc-a60a-34295b97e5da" />
 
 * HTTP-сервер возвращает корректные данные в формате JSON.
@@ -109,7 +109,7 @@ go run ./scr/producer.go
 * Используется Makefile:
 
 Название | Команда | Описание 
-:----------|:--------:|
+:----------|:--------:|:--------:|
 build |go build -o bin/order-service ./cmd/app| Сборка приложения
 run | go run ./cmd/app |  Запуск приложения
 docker-build | docker build -t app . | Сборка Docker образа
@@ -118,9 +118,5 @@ down | docker-compose down | Останов PostgreSQL, Kafka
 status| docker-compose ps | Проверка docker status
 logs | docker-compose logs -f | Показать логи docker-compose
 
-
-
-
-###### P.S. описание будет вскоре добавлено
 
 
