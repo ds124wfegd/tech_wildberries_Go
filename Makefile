@@ -1,18 +1,18 @@
 .PHONY: build, run, docker-build, docker-run, up, down
 
-# Сборка приложения
+# Build app
 build:
 	go build -o bin/order-service ./cmd/app
 
-# Запуск приложения
+# Launch app
 run:
 	go run ./cmd/app
 
-# Сборка Docker образа
+# Building Docker image
 docker-build:
 	docker build -t app .
 
-# Запуск Docker контейнера
+# Launching Docker container
 docker-run:
 	docker run -p 8081:8081 --env-file .env app
 
@@ -31,4 +31,5 @@ status:
 # logs
 logs:
 	docker-compose logs -f
+
 
