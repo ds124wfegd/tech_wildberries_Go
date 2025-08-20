@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Поиск заказов</title>
+</head>
+<body>
+    <div>
+        <h1>Поиск заказов</h1>
+        
+        <div>
+            <input type="text" id="orderId" placeholder="Введите ID заказа:">
+            <button onclick="searchOrder()">Найти заказ</button>
+        </div>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function searchOrder() {
+            const orderId = document.getElementById('orderId').value.trim();
+            const resultDiv = document.getElementById('result');
+            
+            if (!orderId) {
+                showError('Введите ID заказа');
+                return;
+            }
+            
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<div>Поиск заказа...</div>';
+            
+            try {
+                const response = await fetch(`/order/order?order_uid=${encodeURIComponent(orderId)}`);
+                
+                if (response.ok) {
+                    const order = await response.json();
+                    showOrder(order);
+                } else if (response.status === 404) {
+                    showError('Заказ не найден');
+                } else {
+                    showError('Ошибка при поиске заказа');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Ошибка соединения c сервером');
+            }
+        }
+        
+        function showError(message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = `<strong>Ошибка:</strong> ${message}`;
+        }
+        
+        function showOrder(order) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            
+            const orderHtml = `
+                <div>
+                    <div>
+                        <h3>Основная информация</h3>
+                        <div>
+                            <span>ID заказа:</span>
+                            <span>${order.order_uid}</span>
+                        </div>
+                        <div>
+                            <span>Трек номер:</span>
+                            <span>${order.track_number}</span>
+                        </div>
+                        <div>
+                            <span>Дата создания:</span>
+                            <span>${new Date(order.date_created).toLocaleString()}</span>
+                        </div>
+                        <div>
+                            <span>Клиент:</span>
+                            <span>${order.customer_id}</span>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3>Доставка</h3>
+                        <div>
+                            <span>Имя:</span>
+                            <span>${order.delivery.name}</span>
+                        </div>
+                        <div>
+                            <span>Телефон:</span>
+                            <span>${order.delivery.phone}</span>
+                        </div>
+                        <div>
+                            <span>Email:</span>
+                            <span>${order.delivery.email}</span>
+                        </div>
+                        <div>
+                            <span>Адрес:</span>
+                            <span>${order.delivery.address}, ${order.delivery.city}, ${order.delivery.region} ${order.delivery.zip}</span>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3>Оплата</h3>
+                        <div>
+                            <span>Сумма:</span>
+                            <span>${order.payment.amount} ${order.payment.currency}</span>
+                        </div>
+                        <div>
+                            <span>Провайдер:</span>
+                            <span>${order.payment.provider}</span>
+                        </div>
+                        <div>
+                            <span>Банк:</span>
+                            <span>${order.payment.bank}</span>
+                        </div>
+                        <div>
+                            <span>Стоимость доставки:</span>
+                            <span>${order.payment.delivery_cost} ${order.payment.currency}</span>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3>Товары (${order.items.length})</h3>
+                        <ul>
+                            ${order.items.map(item => `
+                                <li>
+                                    <div>
+                                        <span>Название:</span>
+                                        <span>${item.name}</span>
+                                    </div>
+                                    <div>
+                                        <span>Бренд:</span>
+                                        <span>${item.brand}</span>
+                                    </div>
+                                    <div>
+                                        <span>Цена:</span>
+                                        <span>${item.price} ₽</span>
+                                    </div>
+                                    <div>
+                                        <span>Скидка:</span>
+                                        <span>${item.sale}%</span>
+                                    </div>
+                                    <div>
+                                        <span>Итоговая цена:</span>
+                                        <span>${item.total_price} ₽</span>
+                                    </div>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                </div>
+            `;
+            
+            resultDiv.innerHTML = orderHtml;
+        }
+        
+        document.getElementById('orderId').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchOrder();
+            }
+        });
+    </script>
+</body>
+</html>

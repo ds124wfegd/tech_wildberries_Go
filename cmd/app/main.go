@@ -17,7 +17,7 @@ func main() {
 
 	cfg, err := config.ParseConfig(viperInstance)
 	if err != nil {
-		logrus.Fatalf("Cannot parse config. Error: {%s}", err.Error()) // handling errrors related to parsing config
+		logrus.Fatalf("Cannot parse config. Error: {%s}", err.Error()) // handling errors related to parsing config
 	}
 
 	appServer.NewServer(cfg) // creating server

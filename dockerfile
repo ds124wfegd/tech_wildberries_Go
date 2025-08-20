@@ -1,34 +1,31 @@
-# Используем официальный образ Go
+# Using the official Go image
 FROM golang:1.21-alpine AS builder
 
-# Устанавливаем рабочую директорию
+# Installing the working directory
 WORKDIR /app
 
-# Копируем файлы зависимостей
+# Copying the dependency files
 COPY go.mod go.sum ./
 
-# Загружаем зависимости
+# Loading dependencies
 RUN go mod download
 
-# Копируем исходный код
+# Copying the source code
 COPY . .
 
-# Собираем приложение (новая точка входа)
+# Building the app
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/app
 
-# Используем минимальный образ для финального контейнера
+# We use a minimal image for the final container
 FROM alpine:latest
 
-# Устанавливаем ca-certificates для HTTPS запросов
+# Installing ca-certificates for HTTPS requests
 RUN apk --no-cache add ca-certificates
 
 WORKDIR /root/
 
-# Копируем собранное приложение
+# Copying the compiled application
 COPY --from=builder /app/main .
 
-# Открываем порт
-EXPOSE 8081
-
-# Запускаем приложение
+# Launching the app
 CMD ["./main"] 

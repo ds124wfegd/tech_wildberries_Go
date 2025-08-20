@@ -3,6 +3,7 @@ package config
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"github.com/spf13/viper"
@@ -58,4 +59,11 @@ func ParseConfig(v *viper.Viper) (*Config, error) { // the function of parsing a
 		return nil, err
 	}
 	return &c, nil
+}
+
+func GetEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }

@@ -1,4 +1,4 @@
-.PHONY: build run test clean docker-build docker-run infra-up infra-down producer
+.PHONY: build, run, docker-build, docker-run, up, down
 
 # Сборка приложения
 build:
@@ -8,41 +8,27 @@ build:
 run:
 	go run ./cmd/app
 
-# Тестирование
-test:
-	go test ./...
-
-test-integration:
-	go test -tags=integration ./internal/infra/postgres -v
-
-# Очистка
-clean:
-	rm -rf bin/
-	go clean
-
 # Сборка Docker образа
 docker-build:
 	docker build -t app .
 
 # Запуск Docker контейнера
 docker-run:
-	docker run -p 8081:8081 --env-file env.example app
+	docker run -p 8081:8081 --env-file .env app
 
-# Запуск инфраструктуры (PostgreSQL, Kafka)
-infra-up:
+# Launching PostgreSQL, Kafka
+up:
 	docker-compose up -d
 
-# Остановка инфраструктуры
-infra-down:
+# Stopping PostgreSQL, Kafka
+down:
 	docker-compose down
 
-
-
-# Проверка статуса
+# Check docker status
 status:
 	docker-compose ps
 
-# Логи инфраструктуры
+# logs
 logs:
 	docker-compose logs -f
 

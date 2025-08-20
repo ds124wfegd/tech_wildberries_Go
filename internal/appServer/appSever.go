@@ -1,8 +1,10 @@
+// launching the server, DB, kafka, postgres
 package appServer
 
 import (
 	"context"
 	"crypto/tls"
+	"log"
 
 	"net/http"
 	"os"
@@ -11,9 +13,13 @@ import (
 	"time"
 
 	"github.com/ds124wfegd/tech_wildberries_Go/config"
+	"github.com/ds124wfegd/tech_wildberries_Go/internal/cache"
 	"github.com/ds124wfegd/tech_wildberries_Go/internal/database"
+	"github.com/ds124wfegd/tech_wildberries_Go/internal/entity"
+	"github.com/ds124wfegd/tech_wildberries_Go/internal/kafka"
 	"github.com/ds124wfegd/tech_wildberries_Go/internal/service"
 	"github.com/ds124wfegd/tech_wildberries_Go/internal/transport"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,26 +27,17 @@ type Server struct {
 	httpServer *http.Server
 }
 
-/*
-	AppVersion   string `json:"appVersion"`
-	Host         string `json:"host" validate:"required"`
-	Port         string `json:"port" validate:"required"`
-	Timeout      time.Duration
-	Idle_timeout time.Duration
-	Env          string `json:"environment"`
-*/
-
 func (s *Server) Run(cfg *config.Config, handler http.Handler) error {
 	s.httpServer = &http.Server{
 		Addr:              ":" + cfg.Server.Port,
 		Handler:           handler,
 		MaxHeaderBytes:    1 << 20,
 		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      10 * time.Second,
-		IdleTimeout:       60 * time.Second,
+		WriteTimeout:      cfg.Server.Timeout,
+		IdleTimeout:       cfg.Server.Idle_timeout,
 		ReadHeaderTimeout: 3 * time.Second,
-		TLSConfig:         &tls.Config{MinVersion: tls.VersionTLS12}, // запрет на устаревшие сертификаты TLS
-		//	ErrorLog:          log.New(os.Stderr, "SERVER ERROR: ", log.LstdFlags), //далее можно заменить на ElasticSearch вместо os.StdErr!!!!!
+		TLSConfig:         &tls.Config{MinVersion: tls.VersionTLS12},           // ban on outdate TLS certificate
+		ErrorLog:          log.New(os.Stderr, "SERVER ERROR: ", log.LstdFlags), // os.Stderr can be replaced with ElsasticSearch in the feature
 	}
 	return s.httpServer.ListenAndServe()
 }
@@ -52,10 +49,6 @@ func (s *Server) Shutdown(ctx context.Context) error {
 func NewServer(cfg *config.Config) {
 
 	logrus.SetFormatter(new(logrus.JSONFormatter)) // JSON format for logging
-
-	/* if err := godotenv.Load(); err != nil {
-		logrus.Fatalf("error loading env variables: %s", err.Error())
-	}*/
 
 	db, err := database.NewPostgresDB(&config.PostgresConfig{
 		Host:     cfg.Postgres.Host,
@@ -71,8 +64,51 @@ func NewServer(cfg *config.Config) {
 	}
 
 	repos := database.NewRepository(db)
-	services := service.NewService(repos)
-	handlers := transport.NewHandler(services)
+
+	orderCache := cache.NewCache()
+
+	var repo database.OrderRepository
+	if db != nil {
+		repo = repos
+	}
+
+	var cachePort service.OrderCache = orderCache
+
+	services := service.NewService(repos, cachePort)
+	handlers := transport.NewOrderHandler(services)
+
+	// restoring the cache from the db
+	if repo != nil {
+		logrus.Println("Restoring cache from database...")
+		uids, err := repo.GetRecentUIDs(context.Background(), 100)
+		if err != nil {
+			logrus.Printf("Warning: Failed to fetch recent order uids: %v", err)
+		} else {
+			var restoreOrders []*entity.Order
+			for _, uid := range uids {
+				o, err := repo.GetByUID(context.Background(), uid)
+				if err != nil {
+					logrus.Printf("Warning: Failed to get order %s: %v", uid, err)
+					continue
+				}
+				restoreOrders = append(restoreOrders, o)
+			}
+			cachePort.Load(restoreOrders)
+			logrus.Printf("Restored %d orders to cache", len(restoreOrders))
+		}
+	}
+
+	kafkaConsumer := kafka.NewConsumer(
+		[]string{config.GetEnv("KAFKA_BROKERS", "localhost:9094")},
+		config.GetEnv("KAFKA_TOPIC", "orders"),
+		config.GetEnv("KAFKA_GROUP_ID", "order-service"),
+		services,
+	)
+
+	// launching Kafka consumer
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { kafkaConsumer.Start(ctx) }()
 
 	srv := new(Server)
 	go func() {
@@ -81,80 +117,22 @@ func NewServer(cfg *config.Config) {
 		}
 	}()
 
-	logrus.Print("MpApp Started")
+	logrus.Print("App Started")
 
+	// wating for the completion signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 	<-quit
 
-	logrus.Print("MpApp Shutting Down")
+	logrus.Print("App Shutting Down")
 
+	//shutdown - correct completion of the program
 	if err := srv.Shutdown(context.Background()); err != nil {
 		logrus.Errorf("error occured on server shutting down: %s", err.Error())
 	}
 
-	/*if err := db.Close(); err != nil {
+	if err := db.Close(); err != nil {
 		logrus.Errorf("error occured on db connection close: %s", err.Error())
-	}*/
+	}
+
 }
-
-/*// Инициализация PostgreSQL
-pgClient, err := postgres.New(cfg.Postgres.URL)
-if err != nil {
-	log.Fatalf("failed to connect to postgres: %v", err)
-}
-defer pgClient.Close()
-
-// Инициализация репозиториев
-orderRepo := postgres.NewOrderRepository(pgClient)
-cache := in_memory.NewCache()
-
-// Инициализация usecase
-orderUC := usecase.NewOrderUseCase(orderRepo, cache)
-
-// Восстановление кэша из БД
-if err := orderUC.RestoreCache(context.Background()); err != nil {
-	log.Printf("failed to restore cache: %v", err)
-}
-
-// Инициализация Kafka Consumer
-kafkaConsumer := kafka.NewConsumer(
-	cfg.Kafka.Brokers,
-	cfg.Kafka.Topic,
-	cfg.Kafka.GroupID,
-	orderUC,
-)
-defer kafkaConsumer.Close()
-kafkaConsumer.Start(context.Background())
-*/
-
-/*	// Инициализация HTTP сервера
-	router := gin.Default()
-	router.LoadHTMLGlob("internal/delivery/web/template/*")
-
-	// Статические файлы
-	router.Static("/static", "./internal/delivery/web/static")
-
-	// API
-	orderHandler := http.NewOrderHandler(orderUC)
-	router.GET("/order/:order_uid", orderHandler.GetOrder)
-	router.GET("/order/html/:order_uid", orderHandler.GetOrderHTML)
-	router.GET("/", func(c *gin.Context) {
-		c.File("./internal/delivery/web/static/index.html")
-	})
-
-	// Запуск сервера
-	go func() {
-		if err := router.Run(cfg.HTTP.Port); err != nil {
-			log.Fatalf("failed to run http server: %v", err)
-		}
-	}()
-
-	log.Printf("Service started on %s", cfg.HTTP.Port)
-
-	// Ожидание сигнала завершения
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	log.Println("Shutting down server...")
-*/

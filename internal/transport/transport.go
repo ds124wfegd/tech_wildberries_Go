@@ -1,53 +1,56 @@
 package transport
 
 import (
+	"net/http"
+
 	"github.com/ds124wfegd/tech_wildberries_Go/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
-type Handler struct {
-	services *service.Service
+type OrderHandler struct {
+	service service.OrderService
 }
 
-func NewHandler(services *service.Service) *Handler {
-	return &Handler{services: services}
+func NewOrderHandler(service service.OrderService) *OrderHandler {
+	return &OrderHandler{service: service}
 }
 
-func (h *Handler) InitRoutes() *gin.Engine {
+// initialization routing
+func (h *OrderHandler) InitRoutes() *gin.Engine {
 	router := gin.New()
+	router.LoadHTMLGlob("./internal/web/templates/*")
 
-	//router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-
-	/*auth := router.Group("/auth")
+	order := router.Group("/order")
 	{
-		auth.POST("/sign-up", h.signUp)
-		auth.POST("/sign-in", h.signIn)
+		order.GET("/:order_uid", h.GetOrderByID)
+
+		// route for html-page
+		router.GET("/", func(c *gin.Context) {
+			c.HTML(200, "1.html", gin.H{
+				"title": "Поиск заказа",
+			})
+		})
+
+	}
+	return router
+}
+func (h *OrderHandler) GetOrderByID(c *gin.Context) {
+	// recieve parametr from string
+	orderUID := c.Query("order_uid")
+	if orderUID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "order_uid parameter is required"})
+		return
 	}
 
-	api := router.Group("/api", h.userIdentity)
-	{
-		lists := api.Group("/lists")
-		{
-			lists.POST("/", h.createList)
-			lists.GET("/", h.getAllLists)
-			lists.GET("/:id", h.getListById)
-			lists.PUT("/:id", h.updateList)
-			lists.DELETE("/:id", h.deleteList)
+	// recieves order from service
+	order, err := (h.service).GetByUID(c.Request.Context(), orderUID)
+	if err != nil {
+		logrus.Printf("Error getting order %s: %v", orderUID, err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
 
-			items := lists.Group(":id/items")
-			{
-				items.POST("/", h.createItem)
-				items.GET("/", h.getAllItems)
-			}
-		}
-
-		items := api.Group("items")
-		{
-			items.GET("/:id", h.getItemById)
-			items.PUT("/:id", h.updateItem)
-			items.DELETE("/:id", h.deleteItem)
-		}
-	}*/
-
-	return router
+	// send answer
+	c.JSON(http.StatusOK, order)
 }

@@ -8,14 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-/*const (
-	usersTable      = "users"
-	mpListsTable    = "mp_lists"
-	usersListsTable = "users_lists"
-	mpItemsTable    = "mp_items"
-	listsItemsTable = "lists_items"
-)*/
-
+// create DB entity
 func NewPostgresDB(cfg *config.PostgresConfig) (*sqlx.DB, error) {
 	db, err := sqlx.Open(cfg.PgDriver, fmt.Sprintf("host=%s port=%s user=%s dbname=%s sslmode=%s password=%s",
 		cfg.Host, cfg.Port, cfg.User, cfg.DBName, cfg.SSLMode, cfg.Password))
