@@ -14,7 +14,7 @@ docker-build:
 
 # Launching Docker container
 docker-run:
-	docker run -p 8081:8081 --env-file .env app
+	docker run -p 8080:8080 --env-file .env app
 
 # Launching PostgreSQL, Kafka
 up:
@@ -31,5 +31,6 @@ status:
 # logs
 logs:
 	docker-compose logs -f
+
 
 
